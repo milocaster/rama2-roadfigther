@@ -30,30 +30,36 @@ export class Environment {
     if (this.rightPillarY > 300) this.rightPillarY -= 300;
 
     // Scene definitions based on repeating phases
-    // Phase length = 300 score
-    const totalPhase = 1200;
+    // Phase length = 500 score
+    const phaseLength = 500;
+    const totalPhase = 2500;
     const currentPhase = score % totalPhase;
 
-    if (currentPhase < 300) {
+    if (currentPhase < phaseLength * 1) {
         // Scene 1: Day Sunny
         this.isNight = false;
         this.currentWeather = 'none';
         this.sunColor = 'rgba(255, 255, 255, 0)';
-    } else if (currentPhase < 600) {
+    } else if (currentPhase < phaseLength * 2) {
         // Scene 2: Afternoon Rain + Lightning
         this.isNight = false;
         this.currentWeather = 'rain';
         this.sunColor = 'rgba(100, 100, 120, 0.4)'; // Gloomy
-    } else if (currentPhase < 900) {
+    } else if (currentPhase < phaseLength * 3) {
         // Scene 3: Night
         this.isNight = true;
         this.currentWeather = 'none';
         this.sunColor = 'rgba(0, 0, 0, 0.7)'; // Dark
+    } else if (currentPhase < phaseLength * 4) {
+        // Scene 4: Night Snow
+        this.isNight = true;
+        this.currentWeather = 'snow';
+        this.sunColor = 'rgba(0, 0, 0, 0.6)';
     } else {
-        // Scene 4: Night Snow or Day Dust
-        this.isNight = currentPhase < 1050; // Half night snow, half day dust
-        this.currentWeather = this.isNight ? 'snow' : 'dust';
-        this.sunColor = this.isNight ? 'rgba(0, 0, 0, 0.6)' : 'rgba(211, 163, 118, 0.2)';
+        // Scene 5: Day Dust
+        this.isNight = false;
+        this.currentWeather = 'dust';
+        this.sunColor = 'rgba(211, 163, 118, 0.3)';
     }
 
     // Curve Generation (randomly bend left or right occasionally)

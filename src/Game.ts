@@ -17,7 +17,9 @@ export class Game {
   public weather: WeatherSystem;
 
   public isPlaying: boolean = false;
-  
+  public gameState: 'menu' | 'intro' | 'playing' | 'gameover' = 'menu';
+  public introTimer: number = 0;
+  public lastPhaseScore: number = 0;
   public score: number = 0;
   public fuel: number = 100; // max 100
   public speed: number = 0;
@@ -127,11 +129,15 @@ export class Game {
     this.sounds.resume();
     
     this.isPlaying = true;
+    this.gameState = 'intro';
+    this.introTimer = 180; // 3 seconds
     this.score = 0;
     this.fuel = 100;
-    this.speed = 5; // Initial speed
+    this.speed = 0; // Don't move yet
+    this.lastPhaseScore = 0;
     
     this.player.reset(this.canvas.width, this.canvas.height);
+    this.player.y = this.canvas.height + 150; // Start offscreen
     this.hazards.hazards = [];
     this.items.items = [];
 
@@ -147,6 +153,7 @@ export class Game {
 
   public gameOver() {
     this.isPlaying = false;
+    this.gameState = 'gameover';
     this.sounds.stopEngineSound();
     this.sounds.stopBGM();
     this.sounds.playCrashSound();
@@ -158,6 +165,29 @@ export class Game {
 
   private update() {
     if (!this.isPlaying) return;
+
+    if (this.gameState === 'intro') {
+        this.introTimer--;
+        
+        // Intro animation: car drives from bottom
+        const targetY = this.canvas.height - 150;
+        this.player.y += (targetY - this.player.y) * 0.05;
+        
+        // Road scrolls to simulate movement
+        this.env.update(4, this.score);
+        this.player.update(this.canvas.width, 0, 1.0);
+        
+        if (this.introTimer === 120 || this.introTimer === 60) {
+            this.sounds.playIndicatorBeep();
+        }
+        
+        if (this.introTimer === 0) {
+            this.gameState = 'playing';
+            this.speed = 5; // Blast off!
+            this.sounds.playOvertakeSound(); // Engine roar equivalent
+        }
+        return;
+    }
 
     this.processInput();
 
@@ -185,6 +215,16 @@ export class Game {
 
     // Update modules
     this.env.update(this.speed, this.score);
+    
+    // Check 500 progression for bonus
+    const currentPhaseIndex = Math.floor(this.score / 500);
+    if (currentPhaseIndex > this.lastPhaseScore) {
+        this.lastPhaseScore = currentPhaseIndex;
+        this.fuel = Math.min(100, this.fuel + 20); // Bonus Fuel!
+        this.sounds.playCoinSound();
+        this.player.iframeTimer = 60; // Brief invincibility pop as reward
+    }
+    
     this.weather.type = this.env.currentWeather;
     
     // Apply centrifugal force to player based on curve
@@ -195,7 +235,7 @@ export class Game {
     this.player.update(this.canvas.width, curveForce, slipperyMult);
     
     this.weather.update(this.speed, this.canvas.width, this.canvas.height);
-    this.hazards.update(this.speed, this.canvas.width, this.canvas.height, () => this.sounds.playIndicatorBeep(), this.env);
+    this.hazards.update(this.speed, this.canvas.width, this.canvas.height, () => this.sounds.playIndicatorBeep(), () => this.sounds.playWarningBeep(), this.env);
     this.items.update(this.speed, this.canvas.height);
 
     // Collisions
@@ -275,6 +315,26 @@ export class Game {
     if (this.env.sunColor !== 'rgba(255, 255, 255, 0)') {
         this.ctx.fillStyle = this.env.sunColor;
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    }
+    
+    // Intro Text overlay
+    if (this.gameState === 'intro') {
+        this.ctx.save();
+        this.ctx.fillStyle = 'white';
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
+        
+        let msg = 'READY';
+        if (this.introTimer < 120) msg = 'SET';
+        if (this.introTimer < 60) msg = 'GO!!';
+        
+        const scale = 1 + (this.introTimer % 60) / 60; // Pulse effect
+        this.ctx.font = `bold ${40 * scale}px Arial`;
+        this.ctx.shadowColor = '#e74c3c';
+        this.ctx.shadowBlur = 10;
+        this.ctx.translate(this.canvas.width / 2, this.canvas.height / 2 - 100);
+        this.ctx.fillText(msg, 0, 0);
+        this.ctx.restore();
     }
   }
 

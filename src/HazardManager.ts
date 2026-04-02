@@ -22,7 +22,7 @@ export class HazardManager {
   
   constructor() {}
 
-  public update(speed: number, canvasWidth: number, canvasHeight: number, playBeep: () => void, env: Environment) {
+  public update(speed: number, canvasWidth: number, canvasHeight: number, playBeep: () => void, playWarningBeep: () => void, env: Environment) {
     this.spawnTimer++;
     
     if (this.spawnTimer > this.spawnInterval) {
@@ -71,6 +71,10 @@ export class HazardManager {
           // Overtaking: comes from bottom, moves UP screen
           h.y -= h.speedParam; 
           h.active = true;
+          if (h.y > canvasHeight && !h.warned) {
+              h.warned = true;
+              playWarningBeep();
+          }
       } else if (h.type === 'truck') {
           // Slow: comes from top, moves down Slower than static objects (speed) usually
           // Since speed is how fast player approaches static, if truck moves at 3, relative speed difference is (speed - 3).
@@ -128,8 +132,8 @@ export class HazardManager {
         // Motorcycle (from bottom)
         this.hazards.push({
             type: 'motorcycle', lane: Math.floor(Math.random() * 3), laneOffset: 0,
-            y: canvasHeight + 50, width: 20, height: 40,
-            active: true, warnTimer: 0, warned: true, passed: false, speedParam: 6 + Math.random()*4 // Overtake speed
+            y: canvasHeight + 400, width: 20, height: 40,
+            active: true, warnTimer: 0, warned: false, passed: false, speedParam: 6 + Math.random()*4 // Overtake speed
         });
     } else if (r < 0.85) {
         // Truck (from top)
@@ -215,14 +219,15 @@ export class HazardManager {
         } else if (h.type === 'motorcycle') {
             if (h.y > canvasHeight) {
                 // Draw incoming indicator at the bottom edge of screen
-                const blink = Math.floor(Date.now() / 100) % 2 === 0;
+                const blink = Math.floor(Date.now() / 150) % 2 === 0;
                 if (blink) {
                     ctx.fillStyle = '#e74c3c';
-                    ctx.beginPath();
-                    ctx.moveTo(xPos, canvasHeight - 40);
-                    ctx.lineTo(xPos - 15, canvasHeight - 10);
-                    ctx.lineTo(xPos + 15, canvasHeight - 10);
-                    ctx.fill();
+                    ctx.fillRect(xPos - 30, canvasHeight - 40, 60, 30);
+                    ctx.fillStyle = 'white';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.font = 'bold 20px Arial';
+                    ctx.fillText('[ !! ]', xPos, canvasHeight - 25);
                 }
             } else {
                 ctx.fillStyle = '#27ae60'; // Green motorcycle

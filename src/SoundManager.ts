@@ -83,6 +83,15 @@ export class SoundManager {
     }
   }
 
+  public playWarningBeep() {
+    if (!this.ctx || this.isMuted) return;
+    for (let i = 0; i < 3; i++) {
+        setTimeout(() => {
+            this.playTone(1200, 'sine', 0.08, 0.05);
+        }, i * 100);
+    }
+  }
+
   public playOvertakeSound() {
     if (!this.ctx || !this.masterGain || this.isMuted) return;
     // "Ngiwee" sound
