@@ -228,7 +228,7 @@ export class HazardManager {
     }
   }
 
-  public checkCollisions(playerBox: {x: number, y: number, width: number, height: number, jumpHeight: number}, canvasWidth: number) {
+  public checkCollisions(playerBox: {x: number, y: number, width: number, height: number, jumpHeight: number, iframeTimer: number}, canvasWidth: number) {
     const laneWidth = canvasWidth / 3;
     let res = { crash: false, bounce: false, overtakes: 0 };
     
@@ -245,7 +245,7 @@ export class HazardManager {
                               rect1.y < rect2.y + rect2.height &&
                               rect1.y + rect1.height > rect2.y;
 
-        if (isOverlapping) {
+        if (isOverlapping && playerBox.iframeTimer <= 0) {
             if (h.type === 'pothole') {
                 if (playerBox.jumpHeight <= 20) { res.crash = true; h.cleared = true; }
             } else if (h.type === 'pillar') {
@@ -256,7 +256,7 @@ export class HazardManager {
                 res.bounce = true;
                 h.cleared = true; // Mark so we don't double bounce
             }
-        } else {
+        } else if (!isOverlapping) {
             // Overtake detection (Near miss on Y axis, while X is close enough but not colliding)
             if (!h.passed) {
                // If player's center Y is ahead of hazard's center Y, we passed it

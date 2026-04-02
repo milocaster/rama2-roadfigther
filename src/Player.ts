@@ -10,6 +10,7 @@ export class Player {
   public isExploding: boolean = false;
   public explodeTimer: number = 0;
   public skidOffset: number = 0;
+  public iframeTimer: number = 0;
   
   private jumpVelocity: number = 0;
   private gravity: number = 0.8;
@@ -36,6 +37,7 @@ export class Player {
     this.isExploding = false;
     this.explodeTimer = 0;
     this.skidOffset = 0;
+    this.iframeTimer = 0;
   }
 
   public getLaneX(laneIndex: number, canvasWidth: number): number {
@@ -68,17 +70,18 @@ export class Player {
   }
 
   public bounceSkid() {
-      // Force change lane left or right randomly if possible
       if (this.lane === 1) this.lane = Math.random() > 0.5 ? 0 : 2;
       else if (this.lane === 0) this.lane = 1;
       else this.lane = 1;
       
       this.skidOffset = 20 * (Math.random() > 0.5 ? 1 : -1);
+      this.iframeTimer = 60; // 1 second of invincibility
   }
 
   public explode() {
       this.isExploding = true;
       this.explodeTimer = 180; // 3 seconds at 60fps
+      this.iframeTimer = 240; // 4 seconds of invincibility (1s after explosion ends)
   }
 
   public update(canvasWidth: number) {
@@ -88,6 +91,8 @@ export class Player {
             this.isExploding = false; // recover
         }
     }
+
+    if (this.iframeTimer > 0) this.iframeTimer--;
 
     if (this.skidOffset > 0) this.skidOffset -= 1;
     if (this.skidOffset < 0) this.skidOffset += 1;
@@ -144,6 +149,14 @@ export class Player {
         return; // Don't draw car
     }
 
+    // Flicker if invincible (iframe)
+    if (this.iframeTimer > 0 && !this.isExploding) {
+        if (Math.floor(Date.now() / 100) % 2 === 0) {
+            ctx.restore();
+            return;
+        }
+    }
+
     // Draw Car
     // Scale car slightly to simulate perspective when jumping
     const carScale = 1 + (this.jumpHeight / 150);
@@ -192,7 +205,8 @@ export class Player {
       y: this.y - this.height / 2,
       width: this.width,
       height: this.height,
-      jumpHeight: this.jumpHeight
+      jumpHeight: this.jumpHeight,
+      iframeTimer: this.iframeTimer
     };
   }
 }

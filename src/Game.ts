@@ -161,7 +161,7 @@ export class Game {
     // Speed up logic slowly over time if not exploding
     if (!this.player.isExploding) {
       if (this.speed < this.maxSpeed) {
-        this.speed += this.acceleration * 0.01;
+        this.speed += this.acceleration;
       }
       this.sounds.setEngineSpeed(this.speed / this.maxSpeed);
     } else {
@@ -195,11 +195,9 @@ export class Game {
         if (collisions.crash) {
             this.player.explode();
             this.sounds.playCrashSound();
-            if (this.fuel > 10) this.fuel -= 10; // Extra penalty
         } else if (collisions.bounce) {
             this.player.bounceSkid();
             this.sounds.playCrashSound();
-            if (this.fuel > 5) this.fuel -= 5;
             this.speed = Math.max(2, this.speed * 0.5); // Slow down on bounce
         }
 
