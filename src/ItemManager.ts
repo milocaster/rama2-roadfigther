@@ -1,3 +1,5 @@
+import { Environment } from './Environment';
+
 export interface Item {
   type: 'coin' | 'fuel';
   lane: number;
@@ -45,11 +47,12 @@ export class ItemManager {
     });
   }
 
-  public draw(ctx: CanvasRenderingContext2D, canvasWidth: number) {
+  public draw(ctx: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number, env: Environment) {
     const laneWidth = canvasWidth / 3;
 
     for (const item of this.items) {
-      const xPos = (item.lane * laneWidth) + (laneWidth / 2);
+      const curveOffset = env.getCurveOffset(item.y, canvasHeight);
+      const xPos = (item.lane * laneWidth) + (laneWidth / 2) + curveOffset;
 
       ctx.save();
       if (item.type === 'coin') {
@@ -94,7 +97,7 @@ export class ItemManager {
     }
   }
 
-  public checkCollection(playerBox: {x: number, y: number, width: number, height: number, jumpHeight: number}, canvasWidth: number): { coins: number, fuel: number } {
+  public checkCollection(playerBox: {x: number, y: number, width: number, height: number, jumpHeight: number, iframeTimer: number}, canvasWidth: number, canvasHeight: number, env: Environment): { coins: number, fuel: number } {
     const laneWidth = canvasWidth / 3;
     let collectedCoins = 0;
     let collectedFuel = 0;
@@ -102,9 +105,8 @@ export class ItemManager {
     for (const item of this.items) {
         if (item.collected) continue;
 
-        // Roughly check collision with bounding box. Ignore Z-height because you can grab items while jumping?
-        // Actually, maybe you miss items if you jump too high over them. Let's say you can always grab them for better game feel.
-        const iX = (item.lane * laneWidth) + (laneWidth / 2);
+        const curveOffset = env.getCurveOffset(item.y, canvasHeight);
+        const iX = (item.lane * laneWidth) + (laneWidth / 2) + curveOffset;
         
         // Simple AABB
         if (playerBox.x < iX + item.radius &&

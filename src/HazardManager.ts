@@ -1,5 +1,7 @@
+import { Environment } from './Environment';
+
 export interface Hazard {
-  type: 'pillar' | 'pothole' | 'motorcycle' | 'truck' | 'drunkcar';
+  type: 'pillar' | 'pothole' | 'motorcycle' | 'truck' | 'drunkcar' | 'lightning';
   lane: number;
   laneOffset: number; // For swerving
   y: number;
@@ -20,11 +22,11 @@ export class HazardManager {
   
   constructor() {}
 
-  public update(speed: number, canvasWidth: number, canvasHeight: number, playBeep: () => void) {
+  public update(speed: number, canvasWidth: number, canvasHeight: number, playBeep: () => void, env: Environment) {
     this.spawnTimer++;
     
     if (this.spawnTimer > this.spawnInterval) {
-      this.spawnHazard(canvasWidth, canvasHeight);
+      this.spawnHazard(canvasWidth, canvasHeight, env);
       this.spawnTimer = 0;
       this.spawnInterval = Math.max(30, 90 - (speed * 2) + Math.random() * 30);
     }
@@ -48,6 +50,20 @@ export class HazardManager {
         } else {
             h.y += speed;
         }
+      } else if (h.type === 'lightning') {
+          if (!h.active) {
+              h.warnTimer--;
+              h.y += speed;
+              if (h.warnTimer <= 0) {
+                  // STRIKE!
+                  h.active = true;
+                  h.warnTimer = 15; // stays active for 15 frames
+              }
+          } else {
+              h.y += speed;
+              h.warnTimer--;
+              if (h.warnTimer <= 0) h.cleared = true; // remove collision
+          }
       } else if (h.type === 'pothole') {
           h.y += speed;
           h.active = true;
@@ -76,11 +92,21 @@ export class HazardManager {
     }
   }
 
-  private spawnHazard(canvasWidth: number, canvasHeight: number) {
+  private spawnHazard(canvasWidth: number, canvasHeight: number, env: Environment) {
     const r = Math.random();
     const laneWidth = canvasWidth / 3;
 
-    if (r < 0.25) {
+    // During rain, 15% chance to spawn lightning trap
+    if (env.currentWeather === 'rain' && r < 0.15) {
+        this.hazards.push({
+            type: 'lightning', lane: Math.floor(Math.random() * 3), laneOffset: 0,
+            y: 100, width: laneWidth, height: canvasHeight, // Hits the whole lane
+            active: false, warnTimer: 60, warned: false, passed: false, speedParam: 0
+        });
+        return;
+    }
+
+    if (r < 0.35) {
         // Spawn Pillars (can be 1, or 2)
         const type = Math.random();
         if (type > 0.5) {
@@ -130,11 +156,12 @@ export class HazardManager {
       });
   }
 
-  public draw(ctx: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number) {
+  public draw(ctx: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number, env: Environment) {
     const laneWidth = canvasWidth / 3;
 
     for (const h of this.hazards) {
-        const xPos = ((h.lane + h.laneOffset) * laneWidth) + (laneWidth / 2);
+        const curveOffset = env.getCurveOffset(h.y, canvasHeight);
+        const xPos = ((h.lane + h.laneOffset) * laneWidth) + (laneWidth / 2) + curveOffset;
 
         if (h.type === 'pillar') {
             if (!h.active) {
@@ -224,18 +251,46 @@ export class HazardManager {
             ctx.fillStyle = '#f1c40f'; // headlights indicating swerve
             ctx.fillRect(xPos - 18, h.y + 35, 10, 5);
             ctx.fillRect(xPos + 8, h.y + 35, 10, 5);
+        } else if (h.type === 'lightning') {
+            if (!h.active) {
+                // Warning glow on the ground
+                if (Math.floor(Date.now() / 100) % 2 === 0) {
+                    ctx.fillStyle = 'rgba(241, 196, 15, 0.4)';
+                    ctx.beginPath();
+                    ctx.ellipse(xPos, h.y, h.width/2, 50, 0, 0, Math.PI*2);
+                    ctx.fill();
+                }
+            } else {
+                // Strike flashes the lane
+                if (!h.cleared) {
+                    ctx.fillStyle = 'white';
+                    ctx.fillRect(xPos - h.width/2, h.y - h.height/2, h.width, h.height);
+                    
+                    // Main bolt
+                    ctx.strokeStyle = '#f1c40f';
+                    ctx.lineWidth = 8;
+                    ctx.beginPath();
+                    ctx.moveTo(xPos, h.y - h.height/2);
+                    ctx.lineTo(xPos + (Math.random()*40 - 20), h.y - h.height/4);
+                    ctx.lineTo(xPos + (Math.random()*40 - 20), h.y);
+                    ctx.lineTo(xPos + (Math.random()*40 - 20), h.y + h.height/4);
+                    ctx.lineTo(xPos, h.y + h.height/2);
+                    ctx.stroke();
+                }
+            }
         }
     }
   }
 
-  public checkCollisions(playerBox: {x: number, y: number, width: number, height: number, jumpHeight: number, iframeTimer: number}, canvasWidth: number) {
+  public checkCollisions(playerBox: {x: number, y: number, width: number, height: number, jumpHeight: number, iframeTimer: number}, canvasWidth: number, canvasHeight: number, env: Environment) {
     const laneWidth = canvasWidth / 3;
     let res = { crash: false, bounce: false, overtakes: 0 };
     
     for (const h of this.hazards) {
         if (!h.active || h.cleared) continue;
 
-        const hX = ((h.lane + h.laneOffset) * laneWidth) + (laneWidth / 2);
+        const curveOffset = env.getCurveOffset(h.y, canvasHeight);
+        const hX = ((h.lane + h.laneOffset) * laneWidth) + (laneWidth / 2) + curveOffset;
         
         const rect1 = playerBox;
         const rect2 = { x: hX - h.width / 2, y: h.y - h.height / 2, width: h.width, height: h.height };
@@ -248,7 +303,7 @@ export class HazardManager {
         if (isOverlapping && playerBox.iframeTimer <= 0) {
             if (h.type === 'pothole') {
                 if (playerBox.jumpHeight <= 20) { res.crash = true; h.cleared = true; }
-            } else if (h.type === 'pillar') {
+            } else if (h.type === 'pillar' || h.type === 'lightning') {
                 res.crash = true;
                 h.cleared = true;
             } else {

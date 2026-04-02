@@ -3,6 +3,7 @@ import { Environment } from './Environment';
 import { HazardManager } from './HazardManager';
 import { ItemManager } from './ItemManager';
 import { SoundManager } from './SoundManager';
+import { WeatherSystem } from './WeatherSystem';
 
 export class Game {
   public canvas: HTMLCanvasElement;
@@ -13,6 +14,7 @@ export class Game {
   public hazards: HazardManager;
   public items: ItemManager;
   public sounds: SoundManager;
+  public weather: WeatherSystem;
 
   public isPlaying: boolean = false;
   
@@ -48,6 +50,7 @@ export class Game {
     this.hazards = new HazardManager();
     this.items = new ItemManager();
     this.sounds = new SoundManager();
+    this.weather = new WeatherSystem();
 
     // DOM bindings
     this.scoreEl = document.getElementById('score-display')!;
@@ -181,16 +184,25 @@ export class Game {
     this.score += this.speed * 0.01;
 
     // Update modules
-    this.player.update(this.canvas.width);
-    this.env.update(this.speed);
-    this.hazards.update(this.speed, this.canvas.width, this.canvas.height, () => this.sounds.playIndicatorBeep());
+    this.env.update(this.speed, this.score);
+    this.weather.type = this.env.currentWeather;
+    
+    // Apply centrifugal force to player based on curve
+    const curveForce = this.env.targetCurveOffset * 0.005;
+    
+    // Increase slide if it's snow (slippery)
+    const slipperyMult = this.env.currentWeather === 'snow' ? 2.5 : 1.0;
+    this.player.update(this.canvas.width, curveForce, slipperyMult);
+    
+    this.weather.update(this.speed, this.canvas.width, this.canvas.height);
+    this.hazards.update(this.speed, this.canvas.width, this.canvas.height, () => this.sounds.playIndicatorBeep(), this.env);
     this.items.update(this.speed, this.canvas.height);
 
     // Collisions
     const pBox = this.player.getCollisionBox();
     
     if (!this.player.isExploding) {
-        const collisions = this.hazards.checkCollisions(pBox, this.canvas.width);
+        const collisions = this.hazards.checkCollisions(pBox, this.canvas.width, this.canvas.height, this.env);
         
         if (collisions.crash) {
             this.player.explode();
@@ -207,7 +219,7 @@ export class Game {
         }
     }
 
-    const collections = this.items.checkCollection(pBox, this.canvas.width);
+    const collections = this.items.checkCollection(pBox, this.canvas.width, this.canvas.height, this.env);
     if (collections.coins > 0) {
        this.score += collections.coins * 50;
        this.sounds.playCoinSound();
@@ -234,9 +246,36 @@ export class Game {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     
     this.env.draw(this.ctx, this.canvas.width, this.canvas.height);
-    this.items.draw(this.ctx, this.canvas.width);
-    this.hazards.draw(this.ctx, this.canvas.width, this.canvas.height);
-    this.player.draw(this.ctx);
+    this.items.draw(this.ctx, this.canvas.width, this.canvas.height, this.env);
+    this.hazards.draw(this.ctx, this.canvas.width, this.canvas.height, this.env);
+    
+    // Player headlights if night
+    if (this.env.isNight) {
+        this.ctx.save();
+        const pBox = this.player.getCollisionBox();
+        const pCurve = this.env.getCurveOffset(pBox.y, this.canvas.height);
+        const grad = this.ctx.createLinearGradient(pBox.x + pBox.width/2 + pCurve, pBox.y, pBox.x + pBox.width/2 + pCurve, pBox.y - 200);
+        grad.addColorStop(0, 'rgba(255, 255, 200, 0.4)');
+        grad.addColorStop(1, 'rgba(255, 255, 200, 0)');
+        this.ctx.fillStyle = grad;
+        this.ctx.beginPath();
+        this.ctx.moveTo(pBox.x + pBox.width/2 - 15 + pCurve, pBox.y);
+        this.ctx.lineTo(pBox.x + pBox.width/2 - 60 + pCurve, pBox.y - 200);
+        this.ctx.lineTo(pBox.x + pBox.width/2 + 60 + pCurve, pBox.y - 200);
+        this.ctx.lineTo(pBox.x + pBox.width/2 + 15 + pCurve, pBox.y);
+        this.ctx.fill();
+        this.ctx.restore();
+    }
+    
+    this.player.draw(this.ctx, this.env, this.canvas.height);
+
+    // Weather & Atmosphere Overlay
+    this.weather.draw(this.ctx);
+    
+    if (this.env.sunColor !== 'rgba(255, 255, 255, 0)') {
+        this.ctx.fillStyle = this.env.sunColor;
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    }
   }
 
   private loop = () => {

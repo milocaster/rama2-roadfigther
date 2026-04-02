@@ -1,3 +1,5 @@
+import { Environment } from "./Environment";
+
 export class Player {
   public lane: number = 1; // 0 = Left, 1 = Center, 2 = Right
   public targetX: number = 0;
@@ -84,7 +86,7 @@ export class Player {
       this.iframeTimer = 240; // 4 seconds of invincibility (1s after explosion ends)
   }
 
-  public update(canvasWidth: number) {
+  public update(canvasWidth: number, curveForce: number = 0, slipperyMult: number = 1.0) {
     if (this.isExploding) {
         this.explodeTimer--;
         if (this.explodeTimer <= 0) {
@@ -99,7 +101,12 @@ export class Player {
 
     // Smooth horizontal lane transition
     this.targetX = this.getLaneX(this.lane, canvasWidth);
-    this.x += (this.targetX - this.x) * this.slideSpeed;
+    
+    // Add centrifugal force (push opposite to curve) + slippery logic
+    const drift = -curveForce * (1 + (slipperyMult - 1) * 0.5); // slip more
+    this.x += (this.targetX - this.x) * this.slideSpeed * (1 / slipperyMult);
+    this.x += drift;
+    
     this.x += this.skidOffset;
     
     // Smooth vertical position adjustment
@@ -118,15 +125,19 @@ export class Player {
     }
   }
 
-  public draw(ctx: CanvasRenderingContext2D) {
+  public draw(ctx: CanvasRenderingContext2D, env: Environment, canvasHeight: number) {
     ctx.save();
     
+    // Apply curve
+    const curveOffset = env.getCurveOffset(this.y, canvasHeight);
+    const drawX = this.x + curveOffset;
+
     // Shadow gets smaller/lighter when jumping
     ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
     const shadowScale = Math.max(0.5, 1 - (this.jumpHeight / 200));
     const shadowOffset = this.jumpHeight * 0.5;
     ctx.fillRect(
-      this.x - (this.width / 2) * shadowScale + shadowOffset,
+      drawX - (this.width / 2) * shadowScale + shadowOffset,
       this.y - (this.height / 2) * shadowScale + shadowOffset,
       this.width * shadowScale,
       this.height * shadowScale
@@ -138,12 +149,12 @@ export class Player {
         const radius = this.width + Math.sin(t) * 10;
         ctx.fillStyle = Math.sin(t*2) > 0 ? '#e74c3c' : '#f1c40f';
         ctx.beginPath();
-        ctx.arc(this.x, this.y, radius, 0, Math.PI * 2);
+        ctx.arc(drawX, this.y, radius, 0, Math.PI * 2);
         ctx.fill();
         
         ctx.fillStyle = '#fff';
         ctx.beginPath();
-        ctx.arc(this.x, this.y, radius * 0.5, 0, Math.PI * 2);
+        ctx.arc(drawX, this.y, radius * 0.5, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
         return; // Don't draw car
@@ -166,7 +177,7 @@ export class Player {
     // Body
     ctx.fillStyle = '#e74c3c'; // Red car
     ctx.fillRect(
-      this.x - renderWidth / 2, 
+      drawX - renderWidth / 2, 
       this.y - renderHeight / 2 - this.jumpHeight, 
       renderWidth, 
       renderHeight
@@ -175,7 +186,7 @@ export class Player {
     // Windshield
     ctx.fillStyle = '#3498db'; // blueish glass
     ctx.fillRect(
-      this.x - renderWidth * 0.4, 
+      drawX - renderWidth * 0.4, 
       this.y - renderHeight * 0.2 - this.jumpHeight, 
       renderWidth * 0.8, 
       renderHeight * 0.25
@@ -184,7 +195,7 @@ export class Player {
     // Roof/Lights detail
     ctx.fillStyle = '#c0392b';
     ctx.fillRect(
-      this.x - renderWidth * 0.3,
+      drawX - renderWidth * 0.3,
       this.y + renderHeight * 0.1 - this.jumpHeight,
       renderWidth * 0.6,
       renderHeight * 0.3
@@ -192,8 +203,8 @@ export class Player {
 
     // Headlights
     ctx.fillStyle = '#f1c40f'; // Yellow lights
-    ctx.fillRect(this.x - renderWidth * 0.4, this.y - renderHeight / 2 - this.jumpHeight, renderWidth * 0.2, renderHeight * 0.1);
-    ctx.fillRect(this.x + renderWidth * 0.2, this.y - renderHeight / 2 - this.jumpHeight, renderWidth * 0.2, renderHeight * 0.1);
+    ctx.fillRect(drawX - renderWidth * 0.4, this.y - renderHeight / 2 - this.jumpHeight, renderWidth * 0.2, renderHeight * 0.1);
+    ctx.fillRect(drawX + renderWidth * 0.2, this.y - renderHeight / 2 - this.jumpHeight, renderWidth * 0.2, renderHeight * 0.1);
 
     ctx.restore();
   }
