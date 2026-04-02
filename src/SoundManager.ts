@@ -94,25 +94,41 @@ export class SoundManager {
 
   public playOvertakeSound() {
     if (!this.ctx || !this.masterGain || this.isMuted) return;
-    // "Ngiwee" sound
+    
     const now = this.ctx.currentTime;
     const osc = this.ctx.createOscillator();
+    const filter = this.ctx.createBiquadFilter();
     const gain = this.ctx.createGain();
     
     osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(600, now);
-    osc.frequency.exponentialRampToValueAtTime(1200, now + 0.15);
-    osc.frequency.exponentialRampToValueAtTime(800, now + 0.3);
     
-    gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(0.1, now + 0.1);
-    gain.gain.linearRampToValueAtTime(0, now + 0.4);
+    // Doppler effect: High pitch approaching, sharp drop exactly as it passes, low pitch receding
+    const approachTime = 0.15;
+    const passTime = 0.1;
+    const recedeTime = 0.35;
+    
+    // Frequency (Pitch)
+    osc.frequency.setValueAtTime(700, now); // Approaching pitch
+    osc.frequency.setValueAtTime(750, now + approachTime); // Peaks slightly higher just before pass
+    osc.frequency.exponentialRampToValueAtTime(350, now + approachTime + passTime); // Nyeeeee--
+    osc.frequency.linearRampToValueAtTime(250, now + approachTime + passTime + recedeTime); // --rrrrrowww
 
-    osc.connect(gain);
+    // Filter to make it sound like a motor
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(2000, now);
+    filter.frequency.linearRampToValueAtTime(800, now + approachTime + passTime + recedeTime);
+    
+    // Amplitude (Volume distance effect)
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(0.2, now + approachTime); // Maximum volume when directly next to us
+    gain.gain.exponentialRampToValueAtTime(0.01, now + approachTime + passTime + recedeTime);
+
+    osc.connect(filter);
+    filter.connect(gain);
     gain.connect(this.masterGain);
     
     osc.start(now);
-    osc.stop(now + 0.4);
+    osc.stop(now + approachTime + passTime + recedeTime);
   }
 
   public playCoinSound() {
@@ -196,13 +212,15 @@ export class SoundManager {
     this.engineGain = this.ctx.createGain();
     
     this.engineOsc.type = 'sawtooth';
-    this.engineOsc.frequency.value = 50;
+    this.engineOsc.frequency.value = 50; // Deep rumble
     
+    // Add resonance to the engine to make it 'growl'
     const filter = this.ctx.createBiquadFilter();
     filter.type = 'lowpass';
-    filter.frequency.value = 400;
+    filter.frequency.value = 600; // Open up the filter more so we hear it
+    filter.Q.value = 2.0;
     
-    this.engineGain.gain.value = 0.05;
+    this.engineGain.gain.value = 0.12; // Increased volume so it's not drowned out by BGM
     
     this.engineOsc.connect(filter);
     filter.connect(this.engineGain);
@@ -214,7 +232,8 @@ export class SoundManager {
 
   public setEngineSpeed(speedRatio: number) {
      if (this.engineOsc && this.isEngineRunning) {
-         this.engineOsc.frequency.value = 50 + (speedRatio * 50); 
+         // Pitch goes up like a gear revving
+         this.engineOsc.frequency.value = 50 + (speedRatio * 150); // Wider rev range!
      }
   }
 
