@@ -37,6 +37,7 @@ export class Game {
   private finalScoreEl: HTMLElement;
 
   private keys: { [key: string]: boolean } = {};
+  private baseGamma: number | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -62,7 +63,7 @@ export class Game {
     this.finalScoreEl = document.getElementById('final-score')!;
 
     // Event Listeners
-    document.getElementById('start-btn')!.addEventListener('click', () => this.start());
+    document.getElementById('start-btn')!.addEventListener('click', () => this.requestGyroPermissionAndStart());
     document.getElementById('restart-btn')!.addEventListener('click', () => this.start());
     
     document.getElementById('sound-toggle')!.addEventListener('click', (e) => {
@@ -79,9 +80,66 @@ export class Game {
 
     window.addEventListener('keydown', (e) => this.handleKeyDown(e));
     window.addEventListener('keyup', (e) => this.handleKeyUp(e));
+    window.addEventListener('touchstart', (e) => this.handleTouch(e), { passive: false });
 
     // First draw
     this.draw();
+  }
+
+  private requestGyroPermissionAndStart() {
+      if (typeof (DeviceOrientationEvent as any) !== 'undefined' && typeof (DeviceOrientationEvent as any).requestPermission === 'function') {
+          (DeviceOrientationEvent as any).requestPermission()
+          .then((permissionState: string) => {
+              if (permissionState === 'granted') {
+                  window.addEventListener('deviceorientation', (e) => this.handleDeviceOrientation(e));
+              }
+              this.start();
+          })
+          .catch((e: Error) => {
+              console.error(e);
+              this.start();
+          });
+      } else {
+          window.addEventListener('deviceorientation', (e) => this.handleDeviceOrientation(e));
+          this.start();
+      }
+  }
+
+  private handleTouch(e: TouchEvent) {
+    if (!this.isPlaying) return;
+    
+    const target = e.target as HTMLElement;
+    if (target && target.closest('button')) return; // Ignore if tapping a button
+    
+    e.preventDefault(); // Prevent scrolling
+
+    // Tap to jump
+    if (!this.player.isJumping) {
+      this.player.jump(() => this.sounds.playJumpSound());
+    }
+  }
+
+  private handleDeviceOrientation(e: DeviceOrientationEvent) {
+    if (!this.isPlaying || this.player.isExploding || e.gamma === null) return;
+    
+    if (this.baseGamma === null) {
+      this.baseGamma = e.gamma;
+    }
+    
+    // gamma ranges typically -90 to +90 degrees.
+    let tilt = e.gamma - this.baseGamma;
+    
+    // Handle wrap-around just in case
+    if (tilt > 180) tilt -= 360;
+    if (tilt < -180) tilt += 360;
+    
+    if (tilt < -15) {
+       this.player.lane = 0;
+    } else if (tilt > 15) {
+       this.player.lane = 2;
+    } else if (Math.abs(tilt) < 5) {
+       this.player.lane = 1;
+    }
   }
 
   private resize() {
@@ -135,6 +193,7 @@ export class Game {
     this.fuel = 100;
     this.speed = 0; // Don't move yet
     this.lastPhaseScore = 0;
+    this.baseGamma = null; // Recalibrate gyro
     
     this.player.reset(this.canvas.width, this.canvas.height);
     this.player.y = this.canvas.height + 150; // Start offscreen
