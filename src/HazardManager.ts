@@ -90,7 +90,8 @@ export class HazardManager {
       }
 
       // Remove off-screen
-      if (h.y > canvasHeight + 100 || h.y < -300) {
+      const isMotorPushedOutFields = h.type === 'motorcycle' && h.y > canvasHeight + 1000;
+      if ((h.type !== 'motorcycle' && h.y > canvasHeight + 100) || h.y < -300 || isMotorPushedOutFields) {
         this.hazards.splice(i, 1);
       }
     }
