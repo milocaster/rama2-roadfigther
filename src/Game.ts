@@ -28,6 +28,9 @@ export class Game {
 
   private fuelDepletionRate: number = 0.05;
   private animationId: number = 0;
+  private lastTime: number = 0;
+  private accumulator: number = 0;
+  private readonly TIME_STEP = 1000 / 60; // Fixed 60 FPS update logic
 
   // DOM Elements
   private scoreEl: HTMLElement;
@@ -206,8 +209,10 @@ export class Game {
     this.sounds.startEngineSound();
     this.sounds.playBGM();
     
+    this.lastTime = 0;
+    this.accumulator = 0;
     if (this.animationId) cancelAnimationFrame(this.animationId);
-    this.loop();
+    this.animationId = requestAnimationFrame(this.loop);
   }
 
   public gameOver() {
@@ -397,8 +402,25 @@ export class Game {
     }
   }
 
-  private loop = () => {
-    this.update();
+  private loop = (timestamp: number) => {
+    if (!this.lastTime) this.lastTime = timestamp;
+    const dt = timestamp - this.lastTime;
+    this.lastTime = timestamp;
+
+    this.accumulator += dt;
+
+    // Fixed time step update, max 5 updates per frame to prevent spiral of death
+    let updates = 0;
+    while (this.accumulator >= this.TIME_STEP && updates < 5) {
+        this.update();
+        this.accumulator -= this.TIME_STEP;
+        updates++;
+    }
+    
+    if (this.accumulator >= this.TIME_STEP) {
+        this.accumulator = 0; // Drop frames if lagging too hard
+    }
+
     this.draw();
     if (this.isPlaying) {
       this.animationId = requestAnimationFrame(this.loop);
