@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rama 2 Road Fighter</title>
+    <script type="module" crossorigin src="./assets/index-BKEZPIJp.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-u86UxJSy.css">
+  </head>
+  <body>
+    <div id="game-container">
+      <canvas id="game-canvas"></canvas>
+      <div id="ui-overlay">
+        <div class="hud">
+          <div id="score-display">Score: 0</div>
+          <div id="fuel-display">Fuel: <div id="fuel-bar"><div id="fuel-fill"></div></div></div>
+        </div>
+        <button id="sound-toggle" class="icon-btn">🔊</button>
+        <div id="start-screen" class="screen">
+          <h1>Rama 2 Road Fighter</h1>
+          <p>Controls: W, A, S, D</p>
+          <p>Spacebar to Jump</p>
+          <button id="start-btn">Start Engine</button>
+        </div>
+        <div id="game-over-screen" class="screen hidden">
+          <h1>Game Over</h1>
+          <p id="final-score">Score: 0</p>
+          <button id="restart-btn">Try Again</button>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
