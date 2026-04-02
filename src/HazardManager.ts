@@ -130,7 +130,7 @@ export class HazardManager {
       });
   }
 
-  public draw(ctx: CanvasRenderingContext2D, canvasWidth: number) {
+  public draw(ctx: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number) {
     const laneWidth = canvasWidth / 3;
 
     for (const h of this.hazards) {

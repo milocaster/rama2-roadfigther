@@ -237,7 +237,7 @@ export class Game {
     
     this.env.draw(this.ctx, this.canvas.width, this.canvas.height);
     this.items.draw(this.ctx, this.canvas.width);
-    this.hazards.draw(this.ctx, this.canvas.width);
+    this.hazards.draw(this.ctx, this.canvas.width, this.canvas.height);
     this.player.draw(this.ctx);
   }
 
